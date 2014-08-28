@@ -90,6 +90,33 @@ func ReadAllChanges(reader io.Reader) (Changes, error) {
 
 }
 
+// Reads the entire Changes feed to find the LastSequence
+func (p Database) LastSequence() (interface{}, error) {
+	options := map[string]interface{}{}
+	options["since"] = nil
+
+	var innerErr error
+	var lastSequence interface{}
+
+	err := p.Changes(
+		func(reader io.Reader) interface{} {
+			changes, innerErr := ReadAllChanges(reader)
+			if innerErr == nil {
+				lastSequence = changes.LastSequence
+			}
+			return nil // stops changes feed
+		}, options)
+
+	if err != nil {
+		return nil, err
+	}
+	if innerErr != nil {
+		return nil, innerErr
+	}
+	return lastSequence, nil
+
+}
+
 // Changes feeds a ChangeHandler a CouchDB changes feed.
 //
 // The handler receives the body of the stream and is expected to consume
