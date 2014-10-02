@@ -33,7 +33,7 @@ func dumpChangesFeed(dburl string) error {
 				logg.Log("Error reading changes %v", err)
 			}
 			dumpChanges(changes)
-			return nil
+			return nil // stops changes feed
 		}, options)
 	return nil
 }
