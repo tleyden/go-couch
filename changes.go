@@ -126,7 +126,9 @@ func (p Database) Changes(handler ChangeHandler,
 
 	since := options["since"]
 
-	heartbeatTime := i64defopt(options, "heartbeat", 5000)
+	// the min value supported by sync gateway is 25 seconds
+	// see: https://github.com/couchbase/sync_gateway/issues/414
+	heartbeatTime := i64defopt(options, "heartbeat", 25000)
 
 	timeout := time.Minute
 	if heartbeatTime > 0 {
