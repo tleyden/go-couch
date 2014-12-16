@@ -98,6 +98,7 @@ func interact(method, u string, headers map[string][]string, in []byte, out inte
 
 // Database represents operations available on an existing CouchDB
 type Database struct {
+	Scheme   string
 	Host     string
 	Port     string
 	Name     string
@@ -109,10 +110,16 @@ type Database struct {
 
 // BaseURL returns the URL to the database server containing this database.
 func (p Database) BaseURL() string {
-	if p.authinfo == nil {
-		return fmt.Sprintf("http://%s:%s", p.Host, p.Port)
+	var scheme string
+	if p.Scheme == "" {
+		scheme = "http"
+	} else {
+		scheme = p.Scheme
 	}
-	return fmt.Sprintf("http://%s@%s:%s", p.authinfo.String(), p.Host, p.Port)
+	if p.authinfo == nil {
+		return fmt.Sprintf("%s://%s:%s", scheme, p.Host, p.Port)
+	}
+	return fmt.Sprintf("%s://%s@%s:%s", scheme, p.authinfo.String(), p.Host, p.Port)
 }
 
 // DBURL returns the URL to this specific database.
@@ -185,7 +192,15 @@ func Connect(dburl string) (Database, error) {
 		port = hp[1]
 	}
 
-	db := Database{host, port, u.Path[1:], u.User, net.Dial, defaultChangeDelay}
+	db := Database{
+		Scheme:           u.Scheme,
+		Host:             host,
+		Port:             port,
+		Name:             u.Path[1:],
+		authinfo:         u.User,
+		changesDialer:    net.Dial,
+		changesFailDelay: defaultChangeDelay,
+	}
 	if !db.Running() {
 		return Database{}, errNotRunning
 	}
@@ -199,7 +214,7 @@ func Connect(dburl string) (Database, error) {
 // NewDatabase connects to a CouchDB server and creates the specified
 // database if it does not exist.
 func NewDatabase(host, port, name string) (Database, error) {
-	db := Database{host, port, name, nil, net.Dial, defaultChangeDelay}
+	db := Database{"http", host, port, name, nil, net.Dial, defaultChangeDelay}
 	if !db.Running() {
 		return db, errNotRunning
 	}
