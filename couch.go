@@ -3,12 +3,15 @@ package couch
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -20,7 +23,18 @@ var defaultHdrs = map[string][]string{}
 // HTTP Client used by typical requests.
 //
 // Defaults to http.DefaultClient
-var HTTPClient = http.DefaultClient
+var HTTPClient *http.Client
+
+func init() {
+	if len(os.Getenv("GO_COUCH_DISABLE_CERT_CHECK")) > 0 {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		HTTPClient = &http.Client{Transport: tr}
+	} else {
+		HTTPClient = http.DefaultClient
+	}
+}
 
 func createReq(u string) (*http.Request, error) {
 	req, err := http.NewRequest("GET", u, nil)
@@ -133,6 +147,7 @@ func (p Database) Running() bool {
 	u := fmt.Sprintf("%s", p.BaseURL())
 	err := unmarshalURL(u, &welcomeJson)
 	if err != nil {
+		log.Printf("unmarshalURL failed: %s", err.Error())
 		return false
 	}
 	_, ok := welcomeJson["version"]
