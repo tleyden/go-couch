@@ -1,6 +1,7 @@
 package couch
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"time"
 )
@@ -160,14 +162,27 @@ func (p Database) Changes(handler ChangeHandler,
 		var conn net.Conn
 
 		// Swapping out the transport to work around a bug.
-		client := &http.Client{Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: func(n, addr string) (net.Conn, error) {
-				var err error
-				conn, err = p.changesDialer(n, addr)
-				return conn, err
-			},
-		}}
+		var client *http.Client
+		if len(os.Getenv("GO_COUCH_DISABLE_CERT_CHECK")) > 0 {
+			client = &http.Client{Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				Proxy:           http.ProxyFromEnvironment,
+				Dial: func(n, addr string) (net.Conn, error) {
+					var err error
+					conn, err = p.changesDialer(n, addr)
+					return conn, err
+				},
+			}}
+		} else {
+			client = &http.Client{Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				Dial: func(n, addr string) (net.Conn, error) {
+					var err error
+					conn, err = p.changesDialer(n, addr)
+					return conn, err
+				},
+			}}
+		}
 
 		resp, err := client.Get(fullURL)
 		if err == nil {
