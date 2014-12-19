@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -50,23 +52,30 @@ func createReq(u string) (*http.Request, error) {
 	return req, nil
 }
 
-func unmarshalURL(u string, results interface{}) error {
+func readURL(u string) ([]byte, error) {
 	req, err := createReq(u)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	r, err := HTTPClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer r.Body.Close()
 
 	if r.StatusCode != 200 {
-		return httputil.HTTPError(r)
+		return nil, httputil.HTTPError(r)
 	}
+	return ioutil.ReadAll(r.Body)
+}
 
-	return json.NewDecoder(r.Body).Decode(results)
+func unmarshalURL(u string, results interface{}) error {
+	content, err := readURL(u)
+	if err != nil {
+		return err
+	}
+	return json.NewDecoder(bytes.NewBuffer(content)).Decode(results)
 }
 
 type idAndRev struct {
@@ -406,6 +415,17 @@ func (p Database) Retrieve(id string, d interface{}) error {
 	}
 
 	return unmarshalURL(fmt.Sprintf("%s/%s", p.DBURL(), id), d)
+}
+
+func (p Database) RetrieveAttachment(id string, name string) (io.Reader, error) {
+	if id == "" {
+		return nil, errNoID
+	}
+	content, err := readURL(fmt.Sprintf("%s/%s/%s", p.DBURL(), id, name))
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewBuffer(content), nil
 }
 
 // Delete deletes document given by id and rev.
