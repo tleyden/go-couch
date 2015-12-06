@@ -406,6 +406,58 @@ func (p Database) EditWith(d interface{}, id, rev string) (string, error) {
 	return p.Edit(m)
 }
 
+type RetryUpdater func(interface{})
+type RetryDoneMetric func(interface{}) bool
+type RetryRefresh func(interface{}) error
+
+// Update with the ability to update/retry
+//
+// The first return value will be true when it was updated due to calling this method,
+// or false if it was already in that state or put in that state by something else
+// during the update attempt.
+//
+// If any errors occur while trying to update, they will be returned in the second
+// return value.
+func (p Database) EditRetry(doc2update interface{}, updater RetryUpdater, doneMetric RetryDoneMetric, refresh RetryRefresh) (bool, error) {
+
+	if doneMetric(doc2update) == true {
+		return false, nil
+	}
+
+	for {
+		updater(doc2update)
+
+		_, err := p.Edit(doc2update)
+
+		if err != nil {
+
+			// if it failed with any other error than 409, return an error
+			if !httputil.IsHTTPStatus(err, 409) {
+				return false, err
+			}
+
+			// get the latest version of the document
+			if err := refresh(doc2update); err != nil {
+				return false, err
+			}
+
+			// does it already have the new the state (eg, someone else set it)?
+			if doneMetric(doc2update) == true {
+				return false, nil
+			}
+
+			// no, so try updating state and saving again
+			continue
+
+		}
+
+		// successfully saved, we are done
+		return true, nil
+
+	}
+
+}
+
 var errNoID = errors.New("no id specified")
 
 // Retrieve unmarshals the document matching id to the given interface
