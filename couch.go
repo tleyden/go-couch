@@ -406,9 +406,9 @@ func (p Database) EditWith(d interface{}, id, rev string) (string, error) {
 	return p.Edit(m)
 }
 
-type RetryUpdater func(interface{})
-type RetryDoneMetric func(interface{}) bool
-type RetryRefresh func(interface{}) error
+type RetryUpdater func()
+type RetryDoneMetric func() bool
+type RetryRefresh func() error
 
 // Update with the ability to update/retry
 //
@@ -420,12 +420,12 @@ type RetryRefresh func(interface{}) error
 // return value.
 func (p Database) EditRetry(doc2update interface{}, updater RetryUpdater, doneMetric RetryDoneMetric, refresh RetryRefresh) (bool, error) {
 
-	if doneMetric(doc2update) == true {
+	if doneMetric() == true {
 		return false, nil
 	}
 
 	for {
-		updater(doc2update)
+		updater()
 
 		_, err := p.Edit(doc2update)
 
@@ -437,12 +437,12 @@ func (p Database) EditRetry(doc2update interface{}, updater RetryUpdater, doneMe
 			}
 
 			// get the latest version of the document
-			if err := refresh(doc2update); err != nil {
+			if err := refresh(); err != nil {
 				return false, err
 			}
 
 			// does it already have the new the state (eg, someone else set it)?
-			if doneMetric(doc2update) == true {
+			if doneMetric() == true {
 				return false, nil
 			}
 
