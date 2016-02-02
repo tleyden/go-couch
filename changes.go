@@ -205,3 +205,26 @@ func (p Database) Changes(handler ChangeHandler,
 	}
 	return nil
 }
+
+// Simpler interface to Changes feed which returns a Changes struct
+func (p Database) GetChanges(options map[string]interface{}) (changes Changes, err error) {
+
+	var errInner error
+
+	err = p.Changes(
+		func(reader io.Reader) interface{} {
+			changes, errInner = ReadAllChanges(reader)
+			return nil // stops changes feed
+		}, options)
+
+	if errInner != nil {
+		return Changes{}, errInner
+	}
+
+	if err != nil {
+		return Changes{}, err
+	}
+
+	return changes, nil
+
+}
